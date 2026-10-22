@@ -3,7 +3,20 @@
 import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ComposableMap, Geographies, Geography, ZoomableGroup, useMapContext } from "react-simple-maps";
 import { motion } from "motion/react";
-import { Alert, Box, Chip, IconButton, Skeleton, Stack, ToggleButton, ToggleButtonGroup, Tooltip, Typography } from "@mui/material";
+import {
+  Alert,
+  Autocomplete,
+  Box,
+  Chip,
+  IconButton,
+  Skeleton,
+  Stack,
+  TextField,
+  ToggleButton,
+  ToggleButtonGroup,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
 import PublicIcon from "@mui/icons-material/Public";
 import RemoveIcon from "@mui/icons-material/Remove";
@@ -40,6 +53,19 @@ function viewForRegion(region: Region, rev: number): View {
 function countrySlug(name: string): string {
   return `country-${name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-")}`;
 }
+
+interface CountryOption {
+  name: string;
+  displayName: string;
+}
+
+const COUNTRY_OPTIONS: CountryOption[] = (
+  worldData.objects.countries.geometries as Array<{ properties?: { name?: string } }>
+)
+  .map((geometry) => geometry.properties?.name ?? "")
+  .filter(Boolean)
+  .map((name) => ({ name, displayName: countryDisplayName(name) }))
+  .sort((a, b) => a.displayName.localeCompare(b.displayName, "pt-BR"));
 
 interface FramesProps {
   regions: Region[];
@@ -184,6 +210,10 @@ export function AtlasMap() {
   const [mapMode, setMapMode] = useState<"biomes" | "countries">("countries");
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const centerRef = useRef<Coordinates>(WORLD_VIEW.center);
+  const selectedCountry =
+    mapMode === "countries"
+      ? COUNTRY_OPTIONS.find((country) => countrySlug(country.name) === regionSlug) ?? null
+      : null;
 
   const applyView = (next: View) => {
     centerRef.current = next.center;
@@ -342,6 +372,42 @@ export function AtlasMap() {
             );
           })}
         </Stack>
+        {mapMode === "countries" && (
+          <Autocomplete
+            options={COUNTRY_OPTIONS}
+            value={selectedCountry}
+            onChange={(_event, country) => {
+              if (country) {
+                selectCountry(country.name);
+              } else {
+                selectRegion(null);
+              }
+            }}
+            getOptionLabel={(country) => country.displayName}
+            isOptionEqualToValue={(option, value) => option.name === value.name}
+            sx={{
+              mt: 1,
+              width: { xs: "min(100%, 360px)", sm: 360 },
+              pointerEvents: "auto",
+              "& .MuiOutlinedInput-root": {
+                bgcolor: "rgba(15,42,37,0.9)",
+                color: "#EAF1EB",
+              },
+              "& .MuiInputLabel-root": { color: "rgba(234,241,235,0.8)" },
+              "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.35)" },
+              "& .MuiSvgIcon-root": { color: "#EAF1EB" },
+            }}
+            noOptionsText="País não encontrado"
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                label="Pesquisar país"
+                placeholder="Digite o nome do país"
+                size="small"
+              />
+            )}
+          />
+        )}
         {isError && (
           <Alert severity="error" sx={{ mt: 1.5, pointerEvents: "auto", maxWidth: 420 }}>
             {error.message}

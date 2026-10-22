@@ -9,6 +9,7 @@ import type {
   TaxonGroup,
   TaxonomyEntry,
 } from "@/types/dto";
+import { normalizeText, portugueseCommonName } from "@/lib/format";
 
 const BASE_URL = "https://api.inaturalist.org/v2";
 const PER_PAGE = 20;
@@ -166,9 +167,9 @@ async function getRegion(slug: string): Promise<Region> {
     if (!place) throw new ApiError("País não encontrado.", 404, "NOT_FOUND");
     return {
       id: slug,
-      name: place.display_name ?? place.name,
+      name: normalizeText(place.display_name ?? place.name),
       slug,
-      description: `Animais registrados no país ${place.display_name ?? place.name}.`,
+      description: `Animais registrados no país ${normalizeText(place.display_name ?? place.name)}.`,
       inaturalistPlaceId: place.id,
       bounds: { swlat: -90, swlng: -180, nelat: 90, nelng: 180 },
     };
@@ -194,7 +195,7 @@ function mapPhoto(photo: RawPhoto | null | undefined): Photo | null {
     thumbUrl: photo.square_url ?? resized("square"),
     mediumUrl: photo.medium_url ?? resized("medium"),
     largeUrl: photo.large_url ?? resized("large"),
-    attribution: photo.attribution ?? "Foto: iNaturalist",
+    attribution: normalizeText(photo.attribution ?? "Foto: iNaturalist"),
     attributionUrl: `https://www.inaturalist.org/photos/${photo.id}`,
     license: photo.license_code ?? null,
   };
@@ -203,8 +204,8 @@ function mapPhoto(photo: RawPhoto | null | undefined): Photo | null {
 function mapSummary(row: RawSpeciesCount): AnimalSummary {
   return {
     id: row.taxon.id,
-    commonName: row.taxon.preferred_common_name ?? null,
-    scientificName: row.taxon.name,
+    commonName: portugueseCommonName(row.taxon.preferred_common_name),
+    scientificName: normalizeText(row.taxon.name),
     group: row.taxon.iconic_taxon_name ?? null,
     photo: mapPhoto(row.taxon.default_photo),
     observationsCount: row.count,
@@ -222,7 +223,7 @@ const conservationLabels: Record<string, string> = {
 
 function htmlToText(value: string | null | undefined): string | null {
   if (!value) return null;
-  const text = value.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+  const text = normalizeText(value).replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
   return text || null;
 }
 
@@ -237,15 +238,15 @@ function mapDetail(taxon: RawTaxon, region: Region | null, count: number | null)
     .map((item) => ({
       rank: item.rank as string,
       rankLabel: rankLabels[item.rank as string] as string,
-      name: item.name,
-      commonName: item.preferred_common_name ?? null,
+      name: normalizeText(item.name),
+      commonName: portugueseCommonName(item.preferred_common_name),
     }));
   const code = (taxon.conservation_status?.status ?? taxon.conservation_statuses?.find((item) => item.status)?.status)?.toUpperCase();
   const conservation: Conservation | null = code && conservationLabels[code] ? { code, label: conservationLabels[code] } : null;
   return {
     id: taxon.id,
-    commonName: taxon.preferred_common_name ?? null,
-    scientificName: taxon.name,
+    commonName: portugueseCommonName(taxon.preferred_common_name),
+    scientificName: normalizeText(taxon.name),
     group: taxon.iconic_taxon_name ?? null,
     taxonomy,
     conservation,
