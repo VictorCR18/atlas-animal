@@ -288,7 +288,10 @@ export async function fetchAnimals({ slug, page, taxonGroup, search }: AnimalsPa
 
 export async function fetchAnimal(id: number, regionSlug: string | null): Promise<AnimalDetail> {
   const region = regionSlug ? await getRegion(regionSlug) : null;
-  const { results } = await request<{ results: RawTaxon[] }>(`/taxa/${id}`, { fields: "all" });
+  const { results } = await request<{ results: RawTaxon[] }>(`/taxa/${id}`, {
+    fields: "all",
+    locale: "pt-BR",
+  });
   const taxon = results[0];
   if (!taxon) throw new ApiError("Espécie não encontrada.", 404, "NOT_FOUND");
   let count: number | null = null;
