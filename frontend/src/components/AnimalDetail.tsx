@@ -1,0 +1,192 @@
+"use client";
+
+import { useState } from "react";
+import { Alert, Box, Button, Chip, Skeleton, Stack, Typography } from "@mui/material";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import OpenInNewIcon from "@mui/icons-material/OpenInNew";
+import { useAnimalDetail } from "@/hooks/useAnimalDetail";
+import { CONSERVATION_COLORS, displayName, formatCount, groupLabel } from "@/lib/format";
+import { useAtlasStore } from "@/store/atlasStore";
+import { PhotoCredit, PhotoImage } from "./PhotoFigure";
+
+const SCIENTIFIC_RANKS = new Set(["genus", "species"]);
+
+export function AnimalDetail() {
+  const animalId = useAtlasStore((state) => state.animalId);
+  const regionSlug = useAtlasStore((state) => state.regionSlug);
+  const selectAnimal = useAtlasStore((state) => state.selectAnimal);
+  const { data, isLoading, isError, error, refetch } = useAnimalDetail(animalId, regionSlug);
+  const [index, setIndex] = useState(0);
+
+  const photos = data?.photos ?? [];
+  const current = photos[index] ?? null;
+  const name = data ? displayName(data) : "";
+  const group = data ? groupLabel(data.group) : null;
+  const colors = data?.conservation ? CONSERVATION_COLORS[data.conservation.code] : undefined;
+
+  return (
+    <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
+      <Box sx={{ px: 1.5, pt: 1.5 }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => selectAnimal(null)} color="primary">
+          Voltar à lista
+        </Button>
+      </Box>
+
+      <Box sx={{ flex: 1, overflowY: "auto", p: 2.5, pt: 1.5 }}>
+        {isLoading && (
+          <Stack spacing={2} aria-label="Carregando detalhes">
+            <Skeleton variant="rounded" sx={{ aspectRatio: "4 / 3", width: "100%", height: "auto" }} />
+            <Skeleton variant="text" width="60%" height={40} />
+            <Skeleton variant="text" width="40%" />
+            <Skeleton variant="rounded" height={120} />
+          </Stack>
+        )}
+
+        {isError && (
+          <Alert
+            severity="error"
+            action={
+              <Button color="inherit" size="small" onClick={() => void refetch()}>
+                Tentar novamente
+              </Button>
+            }
+          >
+            {error.message}
+          </Alert>
+        )}
+
+        {data && (
+          <Stack spacing={2.5}>
+            <Box>
+              <PhotoImage key={current?.id ?? "none"} photo={current} alt={`Foto de ${name}`} variant="large" />
+              {current && (
+                <Box sx={{ mt: 0.75 }}>
+                  <PhotoCredit photo={current} />
+                </Box>
+              )}
+              {photos.length > 1 && (
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  role="group"
+                  aria-label="Galeria de fotos"
+                  sx={{ mt: 1.5, overflowX: "auto", pb: 0.5 }}
+                >
+                  {photos.map((photo, position) => (
+                    <Box
+                      key={photo.id}
+                      component="button"
+                      type="button"
+                      onClick={() => setIndex(position)}
+                      aria-label={`Mostrar foto ${position + 1} de ${photos.length}`}
+                      aria-current={position === index}
+                      sx={{
+                        p: 0,
+                        flexShrink: 0,
+                        width: 56,
+                        height: 56,
+                        borderRadius: 1,
+                        overflow: "hidden",
+                        cursor: "pointer",
+                        bgcolor: "transparent",
+                        border: "2px solid",
+                        borderColor: position === index ? "secondary.main" : "transparent",
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={photo.thumbUrl}
+                        alt=""
+                        loading="lazy"
+                        sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      />
+                    </Box>
+                  ))}
+                </Stack>
+              )}
+            </Box>
+
+            <Box>
+              <Typography variant="h5" component="h2">
+                {name}
+              </Typography>
+              {data.commonName && (
+                <Typography color="text.secondary" sx={{ fontStyle: "italic" }}>
+                  {data.scientificName}
+                </Typography>
+              )}
+              <Stack direction="row" spacing={1} useFlexGap sx={{ mt: 1.5, flexWrap: "wrap" }}>
+                {group && <Chip label={group} variant="outlined" />}
+                {data.conservation && colors ? (
+                  <Chip
+                    label={`Conservação: ${data.conservation.label}`}
+                    sx={{ bgcolor: colors.bg, color: colors.fg }}
+                  />
+                ) : (
+                  <Chip label="Conservação: sem avaliação" variant="outlined" />
+                )}
+              </Stack>
+            </Box>
+
+            <Box>
+              <Typography variant="subtitle2" component="h3">
+                {data.regionName ? `Observações em ${data.regionName}` : "Observações"}
+              </Typography>
+              <Typography>
+                {data.regionObservationCount === null
+                  ? "Contagem indisponível no momento."
+                  : `${formatCount(data.regionObservationCount)} registros verificados pela comunidade.`}
+              </Typography>
+            </Box>
+
+            {data.summary && (
+              <Box>
+                <Typography variant="subtitle2" component="h3">
+                  Sobre a espécie
+                </Typography>
+                <Typography sx={{ maxWidth: "62ch" }}>{data.summary}</Typography>
+              </Box>
+            )}
+
+            <Box>
+              <Typography variant="subtitle2" component="h3" sx={{ mb: 0.75 }}>
+                Classificação científica
+              </Typography>
+              <Box
+                component="dl"
+                sx={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 2, rowGap: 0.5, m: 0 }}
+              >
+                {data.taxonomy.map((entry) => (
+                  <Box key={entry.rank} sx={{ display: "contents" }}>
+                    <Typography component="dt" variant="body2" color="text.secondary">
+                      {entry.rankLabel}
+                    </Typography>
+                    <Typography
+                      component="dd"
+                      variant="body2"
+                      sx={{ m: 0, fontStyle: SCIENTIFIC_RANKS.has(entry.rank) ? "italic" : "normal" }}
+                    >
+                      {entry.name}
+                      {entry.commonName ? ` (${entry.commonName})` : ""}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+
+            <Button
+              variant="contained"
+              href={data.inaturalistUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              endIcon={<OpenInNewIcon />}
+              sx={{ alignSelf: "flex-start" }}
+            >
+              Ver espécie no iNaturalist
+            </Button>
+          </Stack>
+        )}
+      </Box>
+    </Box>
+  );
+}
