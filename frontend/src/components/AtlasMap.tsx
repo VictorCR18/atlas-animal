@@ -181,7 +181,7 @@ export function AtlasMap() {
 
   const [view, setView] = useState<View>(WORLD_VIEW);
   const [zoom, setZoom] = useState(WORLD_VIEW.zoom);
-  const [mapMode, setMapMode] = useState<"biomes" | "countries">("biomes");
+  const [mapMode, setMapMode] = useState<"biomes" | "countries">("countries");
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const centerRef = useRef<Coordinates>(WORLD_VIEW.center);
 
