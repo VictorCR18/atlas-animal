@@ -37,7 +37,18 @@ export function AnimalDetail() {
         </Button>
       </Box>
 
-      <Box sx={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", p: 2.5, pt: 1.5 }}>
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          p: { xs: 1.5, sm: 2.5 },
+          pt: 1.5,
+          pb: { xs: "calc(1.5rem + env(safe-area-inset-bottom))", sm: 2.5 },
+        }}
+      >
         {isLoading && (
           <Stack spacing={2} aria-label="Carregando detalhes…">
             <Skeleton variant="rounded" sx={{ aspectRatio: "4 / 3", width: "100%", height: "auto" }} />

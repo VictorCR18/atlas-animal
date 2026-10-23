@@ -14,7 +14,7 @@ export function PanelContent() {
   const view = animalId !== null ? "detail" : "list";
 
   return (
-    <Box sx={{ height: "100%", overflow: "hidden" }}>
+    <Box sx={{ height: "100%", minWidth: 0, overflow: "hidden" }}>
       <AnimatePresence mode="wait" initial={false}>
         <motion.div
           key={view}
@@ -22,7 +22,7 @@ export function PanelContent() {
           animate={{ opacity: 1, x: 0 }}
           exit={{ opacity: 0, x: -16 }}
           transition={{ duration: 0.2, ease: "easeOut" }}
-          style={{ height: "100%" }}
+          style={{ height: "100%", minWidth: 0 }}
         >
           {view === "detail" && <AnimalDetail />}
           {view === "list" && <AnimalList key={regionSlug} />}
@@ -35,18 +35,20 @@ export function PanelContent() {
 /** Bottom sheet for small screens: slides up when a region is selected. */
 export function MobileSheet({ open }: { open: boolean }) {
   return (
-    <Box sx={{ display: { xs: "block", md: "none" }, minHeight: 0, overflow: "hidden" }}>
+    <Box sx={{ display: { xs: "block", md: "none" }, minHeight: 0, minWidth: 0, overflow: "hidden" }}>
       <AnimatePresence>
         {open && (
           <motion.section
             key="sheet"
             aria-label="Animais da região"
+            role="region"
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 320, damping: 36 }}
             style={{
               height: "100%",
+              minWidth: 0,
               display: "flex",
               flexDirection: "column",
               background: palette.paper,

@@ -16,6 +16,10 @@ export function Footer() {
         justifyContent: "space-between",
         columnGap: 2,
         flexWrap: "wrap",
+        flexShrink: 0,
+        position: "relative",
+        zIndex: 1,
+        pb: "calc(0.75rem + env(safe-area-inset-bottom))",
       }}
     >
       <Typography variant="caption">

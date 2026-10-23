@@ -26,6 +26,7 @@ import { AnimalCard } from "./AnimalCard";
 
 const chipSx = (active: boolean) => ({
   flexShrink: 0,
+  minHeight: 44,
   bgcolor: active ? "primary.main" : palette.tile,
   color: active ? "primary.contrastText" : "text.primary",
   transition: "background-color 150ms ease",
@@ -85,11 +86,11 @@ export function AnimalList() {
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Box sx={{ p: 2.5, pb: 1.5 }}>
-        <Typography variant="h5" component="h2">
+      <Box sx={{ p: { xs: 1.25, sm: 2.5 }, pb: { xs: 1, sm: 1.5 }, flexShrink: 0 }}>
+        <Typography variant="h5" component="h2" sx={{ fontSize: { xs: "1.25rem", sm: undefined } }}>
           {selectionName ?? region?.name ?? "Região"}
         </Typography>
-        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: "52ch" }}>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: { xs: 0.25, sm: 0.5 }, maxWidth: "52ch" }}>
           {description}
         </Typography>
 
@@ -100,7 +101,7 @@ export function AnimalList() {
           onChange={(event) => setInput(event.target.value)}
           type="search"
           placeholder="Nome popular ou científico…"
-          sx={{ mt: 2 }}
+          sx={{ mt: { xs: 1.25, sm: 2 } }}
           slotProps={{
             htmlInput: { "aria-label": "Buscar animais nesta região", name: "busca", autoComplete: "off", spellCheck: false },
             input: {
@@ -118,7 +119,7 @@ export function AnimalList() {
           spacing={1}
           role="group"
           aria-label="Filtrar por grupo de animais"
-          sx={{ mt: 1.5, overflowX: "auto", pb: 0.5 }}
+          sx={{ mt: { xs: 1, sm: 1.5 }, overflowX: "auto", pb: 0.5, scrollbarWidth: "thin" }}
         >
           <Chip
             label="Todos"
@@ -142,7 +143,18 @@ export function AnimalList() {
 
       {query.isFetching && !query.isLoading && <LinearProgress aria-label="Atualizando a lista" />}
 
-      <Box sx={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", px: 2.5, pb: 2.5 }} aria-live="polite">
+      <Box
+        sx={{
+          flex: 1,
+          minHeight: 0,
+          minWidth: 0,
+          overflowY: "auto",
+          overscrollBehavior: "contain",
+          px: { xs: 1.25, sm: 2.5 },
+          pb: { xs: "calc(1.5rem + env(safe-area-inset-bottom))", sm: 2.5 },
+        }}
+        aria-live="polite"
+      >
         {query.isLoading && (
           <Stack spacing={1.5} aria-label="Carregando animais…">
             {Array.from({ length: 6 }, (_, index) => (
@@ -181,11 +193,17 @@ export function AnimalList() {
 
         {items.length > 0 && (
           <>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+            <Typography
+              variant="body2"
+              color="text.secondary"
+              role="status"
+              aria-live="polite"
+              sx={{ mb: 1.5 }}
+            >
               <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCount(total)}</span>{" "}
               {total === 1 ? "espécie registrada" : "espécies registradas"}
             </Typography>
-            <Stack spacing={1.5} component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
+            <Stack spacing={{ xs: 1.25, sm: 1.5 }} component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
               {items.map((animal) => (
                 <li key={animal.id} style={{ contentVisibility: "auto", containIntrinsicSize: "auto 132px" }}>
                   <AnimalCard animal={animal} />
