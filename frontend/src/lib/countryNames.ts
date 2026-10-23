@@ -143,8 +143,20 @@ const COUNTRY_NAMES_PT: Record<string, string> = {
   "New Zealand": "Nova Zelândia",
   "Cape Verde": "Cabo Verde",
   "Antarctica": "Antártida",
+  Uruguay: "Uruguai",
+  Palestine: "Palestina",
+  Belarus: "Bielorrússia",
+  Hungary: "Hungria",
+  Bulgaria: "Bulgária",
+  Luxembourg: "Luxemburgo",
+  Somaliland: "Somalilândia",
 };
 
 export function countryDisplayName(name: string): string {
   return COUNTRY_NAMES_PT[name] ?? name;
+}
+
+/** Slug of a country region, derived from the map's English country name. */
+export function countrySlug(name: string): string {
+  return `country-${name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-")}`;
 }

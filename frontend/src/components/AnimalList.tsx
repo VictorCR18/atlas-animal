@@ -6,7 +6,6 @@ import {
   Box,
   Button,
   Chip,
-  IconButton,
   InputAdornment,
   LinearProgress,
   Skeleton,
@@ -14,16 +13,24 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
 import SearchIcon from "@mui/icons-material/Search";
 import { useAnimals } from "@/hooks/useAnimals";
 import { useDebounce } from "@/hooks/useDebounce";
 import { useRegions } from "@/hooks/useRegions";
 import { formatCount, GROUP_LABELS } from "@/lib/format";
 import { ApiError } from "@/services/api";
-import { useAtlasStore } from "@/store/atlasStore";
+import { GLOBAL_REGION_SLUG, useAtlasStore } from "@/store/atlasStore";
+import { palette } from "@/theme/theme";
 import { TAXON_GROUPS, type AnimalSummary } from "@/types/dto";
 import { AnimalCard } from "./AnimalCard";
+
+const chipSx = (active: boolean) => ({
+  flexShrink: 0,
+  bgcolor: active ? "primary.main" : palette.tile,
+  color: active ? "primary.contrastText" : "text.primary",
+  transition: "background-color 150ms ease",
+  "&:hover": { bgcolor: active ? "primary.dark" : palette.tileHover },
+});
 
 export function AnimalList() {
   const regionSlug = useAtlasStore((state) => state.regionSlug);
@@ -32,9 +39,14 @@ export function AnimalList() {
   const search = useAtlasStore((state) => state.search);
   const setTaxonGroup = useAtlasStore((state) => state.setTaxonGroup);
   const setSearch = useAtlasStore((state) => state.setSearch);
-  const selectRegion = useAtlasStore((state) => state.selectRegion);
 
   const region = useRegions().data?.find((item) => item.slug === regionSlug);
+
+  const description =
+    region?.description ??
+    (regionSlug === GLOBAL_REGION_SLUG
+      ? "Os animais mais registrados em todo o planeta."
+      : "Espécies registradas pela comunidade do iNaturalist nesta região.");
 
   const [input, setInput] = useState(search);
   const debounced = useDebounce(input, 350);
@@ -74,28 +86,23 @@ export function AnimalList() {
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
       <Box sx={{ p: 2.5, pb: 1.5 }}>
-        <Stack direction="row" spacing={1} sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-          <Box>
-            <Typography variant="h5" component="h2">
-              {selectionName ?? region?.name ?? "Região"}
-            </Typography>
-            {region && (
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: 52 + "ch" }}>
-                {region.description}
-              </Typography>
-            )}
-          </Box>
-        </Stack>
+        <Typography variant="h5" component="h2">
+          {selectionName ?? region?.name ?? "Região"}
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5, maxWidth: "52ch" }}>
+          {description}
+        </Typography>
 
         <TextField
           fullWidth
           size="small"
           value={input}
           onChange={(event) => setInput(event.target.value)}
-          placeholder="Buscar por nome popular ou científico"
+          type="search"
+          placeholder="Nome popular ou científico…"
           sx={{ mt: 2 }}
           slotProps={{
-            htmlInput: { "aria-label": "Buscar animais nesta região" },
+            htmlInput: { "aria-label": "Buscar animais nesta região", name: "busca", autoComplete: "off", spellCheck: false },
             input: {
               startAdornment: (
                 <InputAdornment position="start">
@@ -116,8 +123,7 @@ export function AnimalList() {
           <Chip
             label="Todos"
             clickable
-            color={taxonGroup === null ? "primary" : "default"}
-            variant={taxonGroup === null ? "filled" : "outlined"}
+            sx={chipSx(taxonGroup === null)}
             aria-pressed={taxonGroup === null}
             onClick={() => setTaxonGroup(null)}
           />
@@ -126,8 +132,7 @@ export function AnimalList() {
               key={group}
               label={GROUP_LABELS[group]}
               clickable
-              color={taxonGroup === group ? "primary" : "default"}
-              variant={taxonGroup === group ? "filled" : "outlined"}
+              sx={chipSx(taxonGroup === group)}
               aria-pressed={taxonGroup === group}
               onClick={() => setTaxonGroup(group)}
             />
@@ -137,11 +142,11 @@ export function AnimalList() {
 
       {query.isFetching && !query.isLoading && <LinearProgress aria-label="Atualizando a lista" />}
 
-      <Box sx={{ flex: 1, overflowY: "auto", px: 2.5, pb: 2.5 }} aria-live="polite">
+      <Box sx={{ flex: 1, overflowY: "auto", overscrollBehavior: "contain", px: 2.5, pb: 2.5 }} aria-live="polite">
         {query.isLoading && (
-          <Stack spacing={1.5} aria-label="Carregando animais">
+          <Stack spacing={1.5} aria-label="Carregando animais…">
             {Array.from({ length: 6 }, (_, index) => (
-              <Skeleton key={index} variant="rounded" height={96} />
+              <Skeleton key={index} variant="rounded" height={104} />
             ))}
           </Stack>
         )}
@@ -160,19 +165,29 @@ export function AnimalList() {
         )}
 
         {query.isSuccess && items.length === 0 && (
-          <Typography color="text.secondary" sx={{ py: 3 }}>
-            Nenhum animal encontrado com esses filtros. Remova o grupo ou altere a busca.
-          </Typography>
+          <Box sx={{ py: 3 }}>
+            <Typography color="text.secondary">Nenhum animal encontrado com esses filtros.</Typography>
+            <Button
+              onClick={() => {
+                setInput("");
+                setTaxonGroup(null);
+              }}
+              sx={{ mt: 1 }}
+            >
+              Limpar busca e filtros
+            </Button>
+          </Box>
         )}
 
         {items.length > 0 && (
           <>
             <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-              {formatCount(total)} {total === 1 ? "espécie registrada" : "espécies registradas"}
+              <span style={{ fontVariantNumeric: "tabular-nums" }}>{formatCount(total)}</span>{" "}
+              {total === 1 ? "espécie registrada" : "espécies registradas"}
             </Typography>
             <Stack spacing={1.5} component="ul" sx={{ listStyle: "none", m: 0, p: 0 }}>
               {items.map((animal) => (
-                <li key={animal.id}>
+                <li key={animal.id} style={{ contentVisibility: "auto", containIntrinsicSize: "auto 132px" }}>
                   <AnimalCard animal={animal} />
                 </li>
               ))}
@@ -185,7 +200,7 @@ export function AnimalList() {
                   onClick={() => void fetchNextPage()}
                   disabled={isFetchingNextPage}
                 >
-                  {isFetchingNextPage ? "Carregando..." : "Carregar mais espécies"}
+                  {isFetchingNextPage ? "Carregando…" : "Carregar mais espécies"}
                 </Button>
               </Box>
             )}

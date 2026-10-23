@@ -1,8 +1,9 @@
 import { create } from "zustand";
 import type { TaxonGroup } from "@/types/dto";
-import { countryDisplayName } from "@/lib/countryNames";
+import { countryDisplayName, countrySlug } from "@/lib/countryNames";
 
 export const GLOBAL_REGION_SLUG = "global";
+export const WORLD_LABEL = "Mundo todo";
 
 interface AtlasState {
   regionSlug: string | null;
@@ -19,7 +20,7 @@ interface AtlasState {
 
 export const useAtlasStore = create<AtlasState>((set) => ({
   regionSlug: GLOBAL_REGION_SLUG,
-  selectionName: "Global",
+  selectionName: WORLD_LABEL,
   animalId: null,
   taxonGroup: null,
   search: "",
@@ -29,7 +30,7 @@ export const useAtlasStore = create<AtlasState>((set) => ({
         ? state
         : {
             regionSlug: slug ?? GLOBAL_REGION_SLUG,
-            selectionName: slug ? null : "Global",
+            selectionName: slug ? null : WORLD_LABEL,
             animalId: null,
             taxonGroup: null,
             search: "",
@@ -37,12 +38,12 @@ export const useAtlasStore = create<AtlasState>((set) => ({
     ),
   selectCountry: (name) =>
     set((state) => {
-      const slug = name ? `country-${name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-")}` : null;
+      const slug = name ? countrySlug(name) : null;
       return state.regionSlug === (slug ?? GLOBAL_REGION_SLUG)
         ? state
         : {
             regionSlug: slug ?? GLOBAL_REGION_SLUG,
-            selectionName: name ? countryDisplayName(name) : "Global",
+            selectionName: name ? countryDisplayName(name) : WORLD_LABEL,
             animalId: null,
             taxonGroup: null,
             search: "",

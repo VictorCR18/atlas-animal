@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Bricolage_Grotesque, Public_Sans } from "next/font/google";
 import { AppRouterCacheProvider } from "@mui/material-nextjs/v16-appRouter";
@@ -11,6 +11,8 @@ export const metadata: Metadata = {
   title: "Atlas Animal",
   description: "Explore a fauna por região, com dados e fotos do iNaturalist.",
 };
+
+export const viewport: Viewport = { themeColor: "#0F2A25" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

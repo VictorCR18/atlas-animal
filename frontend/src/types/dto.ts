@@ -70,6 +70,11 @@ export interface Conservation {
   label: string;
 }
 
+export interface SummarySource {
+  name: string;
+  url: string;
+}
+
 export interface AnimalDetail {
   id: number;
   commonName: string | null;
@@ -80,6 +85,7 @@ export interface AnimalDetail {
   regionName: string | null;
   regionObservationCount: number | null;
   summary: string | null;
+  summarySource: SummarySource | null;
   photos: Photo[];
   inaturalistUrl: string;
 }

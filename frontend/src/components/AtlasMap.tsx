@@ -26,7 +26,7 @@ import { useAnimalDistribution } from "@/hooks/useAnimalDistribution";
 import { useAtlasStore } from "@/store/atlasStore";
 import { palette } from "@/theme/theme";
 import type { Region } from "@/types/dto";
-import { countryDisplayName } from "@/lib/countryNames";
+import { countryDisplayName, countrySlug } from "@/lib/countryNames";
 
 type Coordinates = [number, number];
 
@@ -50,10 +50,6 @@ function viewForRegion(region: Region, rev: number): View {
   return { center: [(swlng + nelng) / 2, (swlat + nelat) / 2], zoom, rev };
 }
 
-function countrySlug(name: string): string {
-  return `country-${name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-")}`;
-}
-
 interface CountryOption {
   name: string;
   displayName: string;
@@ -74,9 +70,7 @@ interface FramesProps {
   onSelect: (slug: string) => void;
 }
 
-const BIOME_COLORS = ["#D19A35", "#5E9B68", "#B86F52", "#8C79B8", "#4F9AA8", "#C36A86", "#7C9A4B", "#A77B54"];
-
-/** Approximate biome areas are shown as soft colored regions rather than rectangular boundaries. */
+/** Approximate biome areas are shown as soft regions in the accent color rather than rectangular boundaries. */
 function RegionFrames({ regions, selectedSlug, zoom, onSelect }: FramesProps) {
   const { projection } = useMapContext();
   const [active, setActive] = useState<string | null>(null);
@@ -110,10 +104,10 @@ function RegionFrames({ regions, selectedSlug, zoom, onSelect }: FramesProps) {
 
   return (
     <g>
-      {frames.map(({ region, cx, cy, rx, ry }, index) => {
+      {frames.map(({ region, cx, cy, rx, ry }) => {
         const selected = region.slug === selectedSlug;
         const highlighted = active === region.slug;
-        const fill = BIOME_COLORS[index % BIOME_COLORS.length];
+        const fill = palette.ochre;
         return (
           <g
             key={region.id}
@@ -121,7 +115,7 @@ function RegionFrames({ regions, selectedSlug, zoom, onSelect }: FramesProps) {
             tabIndex={0}
             aria-label={`Selecionar região ${region.name}`}
             aria-pressed={selected}
-            style={{ cursor: "pointer", outline: "none" }}
+            style={{ cursor: "pointer", outline: "none" /* focus is shown by the highlighted outline below */ }}
             onClick={() => onSelect(region.slug)}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === " ") {
@@ -141,7 +135,7 @@ function RegionFrames({ regions, selectedSlug, zoom, onSelect }: FramesProps) {
               ry={ry}
               initial={false}
               animate={{
-                fillOpacity: selected ? 0.3 : highlighted ? 0.18 : 0.07,
+                fillOpacity: selected ? 0.34 : highlighted ? 0.22 : 0.1,
                 strokeWidth: selected || highlighted ? 2.5 : 1.5,
               }}
               transition={{ duration: 0.25 }}
@@ -156,7 +150,7 @@ function RegionFrames({ regions, selectedSlug, zoom, onSelect }: FramesProps) {
                 y={cy}
                 fontSize={12 / zoom}
                 fontWeight={700}
-                fill="#FDF3DC"
+                fill={palette.onOcean}
                 stroke={palette.ocean}
                 strokeWidth={3 / zoom}
                 paintOrder="stroke"
@@ -172,23 +166,24 @@ function RegionFrames({ regions, selectedSlug, zoom, onSelect }: FramesProps) {
   );
 }
 
-function AnimalDistribution({ points }: { points: [number, number][] }) {
+function AnimalDistribution({ points, zoom }: { points: [number, number][]; zoom: number }) {
   const { projection } = useMapContext();
 
   return (
-    <g aria-label="Área aproximada de ocorrência do animal" pointerEvents="none">
+    <g aria-label="Locais onde o animal foi registrado" pointerEvents="none">
       {points.map((point, index) => {
         const position = projection(point);
         if (!position) return null;
         return (
-          <ellipse
+          <circle
             key={`${point[0]}-${point[1]}-${index}`}
             cx={position[0]}
             cy={position[1]}
-            rx={22}
-            ry={15}
-            fill="url(#animal-distribution-gradient)"
-            transform={`rotate(${index * 23 - 25} ${position[0]} ${position[1]})`}
+            r={5 / zoom}
+            fill={palette.ochre}
+            fillOpacity={0.7}
+            stroke={palette.ocean}
+            strokeWidth={0.75 / zoom}
           />
         );
       })}
@@ -210,6 +205,7 @@ export function AtlasMap() {
   const [mapMode, setMapMode] = useState<"biomes" | "countries">("countries");
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const centerRef = useRef<Coordinates>(WORLD_VIEW.center);
+  const hoveredLabel = hoveredCountry ? COUNTRY_OPTIONS.find((country) => countrySlug(country.name) === hoveredCountry)?.displayName : null;
   const selectedCountry =
     mapMode === "countries"
       ? COUNTRY_OPTIONS.find((country) => countrySlug(country.name) === regionSlug) ?? null
@@ -239,7 +235,8 @@ export function AtlasMap() {
         minHeight: 0,
         minWidth: 0,
         overflow: "hidden",
-        "& path": { "vector-effect": "non-scaling-stroke" },
+        "& path": { vectorEffect: "non-scaling-stroke" },
+        "& :focus-visible": { outlineColor: palette.ochre },
       }}
     >
     <ComposableMap
@@ -249,7 +246,7 @@ export function AtlasMap() {
         height={500}
         preserveAspectRatio="xMidYMid slice"
         style={{ width: "100%", height: "100%" }}
-        aria-label="Mapa-múndi interativo com as regiões disponíveis"
+        aria-label="Mapa-múndi interativo: escolha um país para ver os animais registrados nele"
       onClick={(event) => {
           const clickedElement = event.target instanceof Element ? event.target : null;
           const clickedCountry = clickedElement?.closest("[data-country-map-region]");
@@ -258,13 +255,6 @@ export function AtlasMap() {
           }
         }}
     >
-        <defs>
-          <radialGradient id="animal-distribution-gradient">
-            <stop offset="0%" stopColor="#F4C95D" stopOpacity="0.75" />
-            <stop offset="65%" stopColor="#E47B4F" stopOpacity="0.42" />
-            <stop offset="100%" stopColor="#E47B4F" stopOpacity="0" />
-          </radialGradient>
-        </defs>
         <ZoomableGroup
           key={view.rev}
           center={view.center}
@@ -308,70 +298,99 @@ export function AtlasMap() {
               ))
             }
           </Geographies>
-          {animalId !== null && distribution.length > 0 && <AnimalDistribution points={distribution} />}
+          {animalId !== null && distribution.length > 0 && <AnimalDistribution points={distribution} zoom={zoom} />}
           {mapMode === "biomes" && (
             <RegionFrames regions={regions} selectedSlug={regionSlug} zoom={zoom} onSelect={selectRegion} />
           )}
         </ZoomableGroup>
       </ComposableMap>
 
-      <Box sx={{ position: "absolute", top: 0, left: 0, right: 0, p: 2, pointerEvents: "none" }}>
-        <Typography variant="h1" sx={{ fontSize: { xs: "1.4rem", md: "1.75rem" }, color: "#EAF1EB" }}>
+      <Box
+        sx={{
+          position: "absolute",
+          top: { xs: 8, md: 16 },
+          left: { xs: 8, md: 16 },
+          right: { xs: 8, md: "auto" },
+          width: { md: 380 },
+          p: { xs: 1.5, md: 2 },
+          bgcolor: palette.oceanRaised,
+          color: palette.onOcean,
+          borderRadius: 1.5,
+        }}
+      >
+        <Typography variant="h1" translate="no" sx={{ fontSize: { xs: "1.3rem", md: "1.7rem" }, lineHeight: 1.1 }}>
           Atlas Animal
         </Typography>
-        <Stack
-          direction="row"
-          spacing={1}
-          role="group"
-          aria-label="Regiões disponíveis"
-          sx={{ mt: 1.25, overflowX: "auto", pb: 0.5, pointerEvents: "auto" }}
+        <Typography variant="body2" sx={{ mt: 0.5, color: palette.onOceanSoft, display: { xs: "none", sm: "block" } }}>
+          Explore a fauna do mundo, país por país.
+        </Typography>
+
+        <ToggleButtonGroup
+          exclusive
+          fullWidth
+          size="small"
+          value={mapMode}
+          onChange={(_event, value: "biomes" | "countries" | null) => {
+            if (!value) return;
+            if (value === "biomes" && mapMode === "countries" && regionSlug?.startsWith("country-")) {
+              selectRegion(null);
+            }
+            setMapMode(value);
+          }}
+          aria-label="Modo de visualização do mapa"
+          sx={{
+            mt: { xs: 1, sm: 1.5 },
+            "& .MuiToggleButton-root": {
+              color: palette.onOcean,
+              borderColor: "rgba(255,255,255,0.22)",
+              transition: "background-color 150ms ease",
+              "&:hover": { bgcolor: "rgba(255,255,255,0.12)" },
+            },
+            "& .Mui-selected": {
+              bgcolor: `${palette.ochre} !important`,
+              color: `${palette.ocean} !important`,
+              fontWeight: 700,
+            },
+          }}
         >
-          <ToggleButtonGroup
-            exclusive
-            size="small"
-            value={mapMode}
-            onChange={(_event, value: "biomes" | "countries" | null) => {
-              if (!value) return;
-              if (value === "biomes" && mapMode === "countries" && regionSlug?.startsWith("country-")) {
-                selectRegion(null);
-              }
-              setMapMode(value);
-            }}
-            aria-label="Modo de visualização do mapa"
-            sx={{
-              flexShrink: 0,
-              "& .MuiToggleButton-root": { color: "#EAF1EB", borderColor: "rgba(255,255,255,0.28)" },
-              "& .Mui-selected": { bgcolor: `${palette.ochre} !important`, color: `${palette.ocean} !important` },
-            }}
+          <ToggleButton value="countries">Países</ToggleButton>
+          <ToggleButton value="biomes">Biomas</ToggleButton>
+        </ToggleButtonGroup>
+
+        {mapMode === "biomes" && (
+          <Stack
+            direction="row"
+            spacing={1}
+            role="group"
+            aria-label="Biomas disponíveis"
+            sx={{ mt: 1.25, overflowX: "auto", pb: 0.5 }}
           >
-            <ToggleButton value="biomes">Biomas</ToggleButton>
-            <ToggleButton value="countries">Países</ToggleButton>
-          </ToggleButtonGroup>
-          {isLoading &&
-            Array.from({ length: 4 }, (_, index) => (
-              <Skeleton key={index} variant="rounded" width={96} height={32} sx={{ bgcolor: "rgba(255,255,255,0.12)" }} />
-            ))}
-          {mapMode === "biomes" && regions.map((region) => {
-            const selected = region.slug === regionSlug;
-            return (
-              <Chip
-                key={region.id}
-                label={region.name}
-                clickable
-                aria-pressed={selected}
-                onClick={() => selectRegion(region.slug)}
-                sx={{
-                  flexShrink: 0,
-                  bgcolor: selected ? palette.ochre : "rgba(255,255,255,0.1)",
-                  color: selected ? palette.ocean : "#EAF1EB",
-                  border: "1px solid",
-                  borderColor: selected ? palette.ochre : "rgba(255,255,255,0.28)",
-                  "&:hover": { bgcolor: selected ? palette.ochre : "rgba(255,255,255,0.2)" },
-                }}
-              />
-            );
-          })}
-        </Stack>
+            {isLoading &&
+              Array.from({ length: 4 }, (_, index) => (
+                <Skeleton key={index} variant="rounded" width={96} height={32} sx={{ bgcolor: "rgba(255,255,255,0.12)" }} />
+              ))}
+            {regions.map((region) => {
+              const selected = region.slug === regionSlug;
+              return (
+                <Chip
+                  key={region.id}
+                  label={region.name}
+                  clickable
+                  aria-pressed={selected}
+                  onClick={() => selectRegion(region.slug)}
+                  sx={{
+                    flexShrink: 0,
+                    bgcolor: selected ? palette.ochre : "rgba(255,255,255,0.1)",
+                    color: selected ? palette.ocean : palette.onOcean,
+                    transition: "background-color 150ms ease",
+                    "&:hover": { bgcolor: selected ? palette.ochre : "rgba(255,255,255,0.2)" },
+                  }}
+                />
+              );
+            })}
+          </Stack>
+        )}
+
         {mapMode === "countries" && (
           <Autocomplete
             options={COUNTRY_OPTIONS}
@@ -387,37 +406,54 @@ export function AtlasMap() {
             isOptionEqualToValue={(option, value) => option.name === value.name}
             sx={{
               mt: 1,
-              width: { xs: "min(100%, 360px)", sm: 360 },
-              pointerEvents: "auto",
-              "& .MuiOutlinedInput-root": {
-                bgcolor: "rgba(15,42,37,0.9)",
-                color: "#EAF1EB",
-              },
-              "& .MuiInputLabel-root": { color: "rgba(234,241,235,0.8)" },
-              "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.35)" },
-              "& .MuiSvgIcon-root": { color: "#EAF1EB" },
+              "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.08)", color: palette.onOcean },
+              "& .MuiInputLabel-root": { color: palette.onOceanSoft },
+              "& .MuiInputLabel-root.Mui-focused": { color: palette.ochre },
+              "& .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.22)" },
+              "& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline": { borderColor: "rgba(255,255,255,0.45)" },
+              "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": { borderColor: palette.ochre },
+              "& .MuiSvgIcon-root": { color: palette.onOcean },
             }}
             noOptionsText="País não encontrado"
+            clearText="Limpar"
+            openText="Abrir"
+            closeText="Fechar"
             renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Pesquisar país"
-                placeholder="Digite o nome do país"
-                size="small"
-              />
+              <TextField {...params} label="Pesquisar país" placeholder="Digite o nome do país…" size="small" />
             )}
           />
         )}
+
         {isError && (
-          <Alert severity="error" sx={{ mt: 1.5, pointerEvents: "auto", maxWidth: 420 }}>
+          <Alert severity="error" sx={{ mt: 1.5 }}>
             {error.message}
           </Alert>
         )}
       </Box>
 
+      {hoveredLabel && (
+        <Typography
+          aria-hidden
+          sx={{
+            position: "absolute",
+            left: { xs: 8, md: 16 },
+            bottom: { xs: 8, md: 16 },
+            px: 1.5,
+            py: 0.75,
+            bgcolor: palette.oceanRaised,
+            color: palette.onOcean,
+            borderRadius: 1,
+            fontWeight: 600,
+            pointerEvents: "none",
+          }}
+        >
+          {hoveredLabel}
+        </Typography>
+      )}
+
       <Stack
         spacing={0.5}
-        sx={{ position: "absolute", right: 12, bottom: 12, bgcolor: "rgba(15,42,37,0.85)", borderRadius: 2 }}
+        sx={{ position: "absolute", right: 12, bottom: 12, bgcolor: palette.oceanRaised, borderRadius: 1.5, p: 0.5 }}
       >
         {[
           { label: "Aproximar o mapa", icon: <AddIcon />, onClick: () => step(1.6) },
@@ -432,7 +468,11 @@ export function AtlasMap() {
           },
         ].map((control) => (
           <Tooltip key={control.label} title={control.label} placement="left">
-            <IconButton aria-label={control.label} onClick={control.onClick} sx={{ color: "#EAF1EB" }}>
+            <IconButton
+              aria-label={control.label}
+              onClick={control.onClick}
+              sx={{ color: palette.onOcean, "&:hover": { bgcolor: "rgba(255,255,255,0.14)" } }}
+            >
               {control.icon}
             </IconButton>
           </Tooltip>

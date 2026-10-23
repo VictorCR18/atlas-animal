@@ -43,13 +43,21 @@ export function normalizeText(value: string): string {
   return normalized;
 }
 
-export function portugueseCommonName(value: string | null | undefined): string | null {
+export const capitalizeFirst = (value: string): string => value.charAt(0).toLocaleUpperCase("pt-BR") + value.slice(1);
+
+/**
+ * Popular name in Portuguese, or null. iNaturalist answers with the English name
+ * when a locale has none, so a name equal to `englishName` counts as untranslated.
+ */
+export function portugueseCommonName(value: string | null | undefined, englishName?: string | null): string | null {
   if (!value) return null;
-  const normalized = normalizeText(value);
-  return NON_LATIN_SCRIPT.test(normalized) ? null : normalized;
+  const normalized = normalizeText(value).trim();
+  if (!normalized || NON_LATIN_SCRIPT.test(normalized)) return null;
+  if (englishName && normalized.toLocaleLowerCase() === normalizeText(englishName).trim().toLocaleLowerCase()) return null;
+  return capitalizeFirst(normalized);
 }
 
-/** Common name in pt-BR when available, scientific name otherwise. */
+/** Brazilian popular name when known, scientific name otherwise. */
 export function displayName(animal: Pick<AnimalSummary, "commonName" | "scientificName">): string {
   return portugueseCommonName(animal.commonName) ?? normalizeText(animal.scientificName);
 }

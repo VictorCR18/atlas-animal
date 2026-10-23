@@ -15,9 +15,10 @@ interface PhotoImageProps {
 export function PhotoImage({ photo, alt, variant }: PhotoImageProps) {
   const [failed, setFailed] = useState(false);
   const src = photo ? (variant === "thumb" ? photo.thumbUrl : photo.largeUrl) : null;
+  const size = variant === "thumb" ? { width: 80, height: 80 } : { width: 800, height: 600 };
   const sizing =
     variant === "thumb"
-      ? { width: 72, height: 72, flexShrink: 0, borderRadius: 1 }
+      ? { width: size.width, height: size.height, flexShrink: 0, borderRadius: 1 }
       : { width: "100%", aspectRatio: "4 / 3", borderRadius: 1.5 };
 
   return (
@@ -27,6 +28,8 @@ export function PhotoImage({ photo, alt, variant }: PhotoImageProps) {
           component="img"
           src={src}
           alt={alt}
+          width={size.width}
+          height={size.height}
           loading="lazy"
           onError={() => setFailed(true)}
           sx={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}

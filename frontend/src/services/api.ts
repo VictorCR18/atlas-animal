@@ -10,10 +10,13 @@ import type {
   TaxonomyEntry,
 } from "@/types/dto";
 import { normalizeText, portugueseCommonName } from "@/lib/format";
+import { brazilianNames, looksPortuguese, portugueseSummary } from "@/services/ptWiki";
 
 const BASE_URL = "https://api.inaturalist.org/v2";
 const PER_PAGE = 20;
 const ANIMALIA_TAXON_ID = 1;
+// iNaturalist place for Brazil: makes common names follow the usage in Brazil.
+const BRAZIL_PLACE_ID = 6878;
 
 export class ApiError extends Error {
   constructor(
@@ -41,6 +44,7 @@ interface RawTaxon {
   name: string;
   rank?: string;
   preferred_common_name?: string;
+  english_common_name?: string;
   iconic_taxon_name?: string;
   default_photo?: RawPhoto | null;
   taxon_photos?: { photo: RawPhoto }[];
@@ -48,6 +52,7 @@ interface RawTaxon {
   conservation_status?: { status?: string } | null;
   conservation_statuses?: { status?: string }[];
   wikipedia_summary?: string | null;
+  wikipedia_url?: string | null;
 }
 
 interface RawSpeciesCount {
@@ -144,9 +149,9 @@ async function getRegion(slug: string): Promise<Region> {
   if (slug === "global") {
     return {
       id: "global",
-      name: "Global",
+      name: "Mundo todo",
       slug: "global",
-      description: "Animais registrados no mundo todo.",
+      description: "Os animais mais registrados em todo o planeta.",
       inaturalistPlaceId: 0,
       bounds: { swlat: -90, swlng: -180, nelat: 90, nelng: 180 },
     };
@@ -204,7 +209,7 @@ function mapPhoto(photo: RawPhoto | null | undefined): Photo | null {
 function mapSummary(row: RawSpeciesCount): AnimalSummary {
   return {
     id: row.taxon.id,
-    commonName: portugueseCommonName(row.taxon.preferred_common_name),
+    commonName: portugueseCommonName(row.taxon.preferred_common_name, row.taxon.english_common_name),
     scientificName: normalizeText(row.taxon.name),
     group: row.taxon.iconic_taxon_name ?? null,
     photo: mapPhoto(row.taxon.default_photo),
@@ -227,7 +232,7 @@ function htmlToText(value: string | null | undefined): string | null {
   return text || null;
 }
 
-function mapDetail(taxon: RawTaxon, region: Region | null, count: number | null): AnimalDetail {
+function mapDetail(taxon: RawTaxon, region: Region | null): AnimalDetail {
   const photos = (taxon.taxon_photos ?? [])
     .map(({ photo }) => mapPhoto(photo))
     .filter((photo): photo is Photo => photo !== null)
@@ -239,20 +244,25 @@ function mapDetail(taxon: RawTaxon, region: Region | null, count: number | null)
       rank: item.rank as string,
       rankLabel: rankLabels[item.rank as string] as string,
       name: normalizeText(item.name),
-      commonName: portugueseCommonName(item.preferred_common_name),
+      // Without the English name there is no way to tell a translation from the English fallback.
+      commonName: item.english_common_name ? portugueseCommonName(item.preferred_common_name, item.english_common_name) : null,
     }));
+  // iNaturalist falls back to the English article when there is no Portuguese one.
+  const wikiText = htmlToText(taxon.wikipedia_summary);
+  const inaturalistSummary = wikiText && looksPortuguese(wikiText) ? wikiText : null;
   const code = (taxon.conservation_status?.status ?? taxon.conservation_statuses?.find((item) => item.status)?.status)?.toUpperCase();
   const conservation: Conservation | null = code && conservationLabels[code] ? { code, label: conservationLabels[code] } : null;
   return {
     id: taxon.id,
-    commonName: portugueseCommonName(taxon.preferred_common_name),
+    commonName: portugueseCommonName(taxon.preferred_common_name, taxon.english_common_name),
     scientificName: normalizeText(taxon.name),
     group: taxon.iconic_taxon_name ?? null,
     taxonomy,
     conservation,
     regionName: region?.name ?? null,
-    regionObservationCount: count,
-    summary: htmlToText(taxon.wikipedia_summary),
+    regionObservationCount: null,
+    summary: inaturalistSummary,
+    summarySource: inaturalistSummary && taxon.wikipedia_url ? { name: "Wikipédia", url: taxon.wikipedia_url } : null,
     photos: photos.length > 0 ? photos : fallback ? [fallback] : [],
     inaturalistUrl: `https://www.inaturalist.org/taxa/${taxon.id}`,
   };
@@ -275,16 +285,30 @@ export async function fetchAnimals({ slug, page, taxonGroup, search }: AnimalsPa
     quality_grade: "research",
     photos: "true",
     locale: "pt-BR",
+    preferred_place_id: BRAZIL_PLACE_ID,
     fields: "all",
     page,
     per_page: PER_PAGE,
   };
-  if (region.inaturalistPlaceId > 0) query.preferred_place_id = region.inaturalistPlaceId;
   const data = await request<{ total_results: number; results: RawSpeciesCount[] }>("/observations/species_counts", query);
+  const summaries = data.results.map(mapSummary);
+  const known = await brazilianNames(summaries.filter((item) => !item.commonName).map((item) => item.scientificName));
+  const items = summaries.map((item) => (item.commonName ? item : { ...item, commonName: known.get(item.scientificName) ?? null }));
   return {
-    items: data.results.map(mapSummary),
+    items,
     pagination: { page, perPage: PER_PAGE, total: data.total_results, totalPages: Math.max(1, Math.ceil(data.total_results / PER_PAGE)) },
   };
+}
+
+async function regionObservationCount(id: number, region: Region): Promise<number | null> {
+  try {
+    const data = await request<{ total_results: number }>("/observations", {
+      ...placeParams(region), taxon_id: id, quality_grade: "research", per_page: 1, fields: "id",
+    });
+    return data.total_results;
+  } catch {
+    return null;
+  }
 }
 
 export async function fetchAnimal(id: number, regionSlug: string | null): Promise<AnimalDetail> {
@@ -292,21 +316,24 @@ export async function fetchAnimal(id: number, regionSlug: string | null): Promis
   const { results } = await request<{ results: RawTaxon[] }>(`/taxa/${id}`, {
     fields: "all",
     locale: "pt-BR",
+    preferred_place_id: BRAZIL_PLACE_ID,
   });
   const taxon = results[0];
   if (!taxon) throw new ApiError("Espécie não encontrada.", 404, "NOT_FOUND");
-  let count: number | null = null;
-  if (region) {
-    try {
-      const data = await request<{ total_results: number }>("/observations", {
-        ...placeParams(region), taxon_id: id, quality_grade: "research", per_page: 1, fields: "id",
-      });
-      count = data.total_results;
-    } catch {
-      count = null;
-    }
-  }
-  return mapDetail(taxon, region, count);
+
+  const detail = mapDetail(taxon, region);
+  const [count, names, summary] = await Promise.all([
+    region ? regionObservationCount(id, region) : null,
+    detail.commonName ? null : brazilianNames([detail.scientificName]),
+    detail.summary ? null : portugueseSummary(detail.scientificName),
+  ]);
+  return {
+    ...detail,
+    commonName: detail.commonName ?? names?.get(detail.scientificName) ?? null,
+    regionObservationCount: count,
+    summary: summary?.text ?? detail.summary,
+    summarySource: summary?.source ?? detail.summarySource,
+  };
 }
 
 export async function fetchAnimalDistribution(id: number): Promise<DistributionPoint[]> {
