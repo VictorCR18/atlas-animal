@@ -20,7 +20,7 @@ import {
 import AddIcon from "@mui/icons-material/Add";
 import PublicIcon from "@mui/icons-material/Public";
 import RemoveIcon from "@mui/icons-material/Remove";
-import worldData from "world-atlas/countries-110m.json";
+import worldData from "world-atlas/countries-50m.json";
 import { useRegions } from "@/hooks/useRegions";
 import { useAnimalDistribution } from "@/hooks/useAnimalDistribution";
 import { useAtlasStore } from "@/store/atlasStore";
