@@ -91,3 +91,38 @@ export interface AnimalDetail {
 }
 
 export type DistributionPoint = [number, number];
+
+export interface GroupCount {
+  group: string;
+  count: number;
+}
+export interface RawPhoto {
+  id: number;
+  url?: string;
+  square_url?: string;
+  medium_url?: string;
+  large_url?: string;
+  attribution?: string;
+  license_code?: string | null;
+}
+
+export interface RawTaxon {
+  id: number;
+  name: string;
+  rank?: string;
+  preferred_common_name?: string;
+  english_common_name?: string;
+  iconic_taxon_name?: string;
+  default_photo?: RawPhoto | null;
+  taxon_photos?: { photo: RawPhoto }[];
+  ancestors?: RawTaxon[];
+  conservation_status?: { status?: string } | null;
+  conservation_statuses?: { status?: string }[];
+  wikipedia_summary?: string | null;
+  wikipedia_url?: string | null;
+}
+
+export interface RawSpeciesCount {
+  count: number;
+  taxon: RawTaxon;
+}

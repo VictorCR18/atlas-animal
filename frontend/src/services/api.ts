@@ -4,18 +4,18 @@ import type {
   AnimalSummary,
   Conservation,
   DistributionPoint,
-  GroupCount,
   Photo,
   Region,
   TaxonGroup,
   TaxonomyEntry,
+  RawPhoto,
+  RawSpeciesCount,
+  RawTaxon
 } from "@/types/dto";
 import { normalizeText, portugueseCommonName } from "@/lib/format";
-import { TAXON_GROUPS } from "@/types/dto";
 import { brazilianNames, looksPortuguese, portugueseSummary } from "@/services/ptWiki";
 
 const BASE_URL = "https://api.inaturalist.org/v2";
-const BASE_URL_V1 = "https://api.inaturalist.org/v1";
 const PER_PAGE = 20;
 const ANIMALIA_TAXON_ID = 1;
 // iNaturalist place for Brazil: makes common names follow the usage in Brazil.
@@ -30,37 +30,6 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
-}
-
-interface RawPhoto {
-  id: number;
-  url?: string;
-  square_url?: string;
-  medium_url?: string;
-  large_url?: string;
-  attribution?: string;
-  license_code?: string | null;
-}
-
-interface RawTaxon {
-  id: number;
-  name: string;
-  rank?: string;
-  preferred_common_name?: string;
-  english_common_name?: string;
-  iconic_taxon_name?: string;
-  default_photo?: RawPhoto | null;
-  taxon_photos?: { photo: RawPhoto }[];
-  ancestors?: RawTaxon[];
-  conservation_status?: { status?: string } | null;
-  conservation_statuses?: { status?: string }[];
-  wikipedia_summary?: string | null;
-  wikipedia_url?: string | null;
-}
-
-interface RawSpeciesCount {
-  count: number;
-  taxon: RawTaxon;
 }
 
 const regions: Region[] = [
@@ -350,20 +319,4 @@ export async function fetchAnimalDistribution(id: number): Promise<DistributionP
   return data.results
     .map((item) => item.geojson?.type === "Point" && item.geojson.coordinates ? item.geojson.coordinates : null)
     .filter((point): point is DistributionPoint => point !== null);
-}
-
-const ANIMAL_ICONICS = new Set<string>([...TAXON_GROUPS, "Animalia"]);
-
-/** Species per animal group in a region, largest first. One request; the v2 API has no equivalent endpoint. */
-export async function fetchGroupCounts(slug: string): Promise<GroupCount[]> {
-  const region = await getRegion(slug);
-  const data = await request<{ results: { count: number; taxon: { name: string; iconic_taxon_name?: string } }[] }>(
-    "/observations/iconic_taxa_species_counts",
-    { ...placeParams(region), quality_grade: "research", photos: "true" },
-    BASE_URL_V1,
-  );
-  return data.results
-    .map((row) => ({ group: row.taxon.iconic_taxon_name ?? row.taxon.name, count: row.count }))
-    .filter((row) => ANIMAL_ICONICS.has(row.group) && row.count > 0)
-    .sort((a, b) => b.count - a.count);
 }
