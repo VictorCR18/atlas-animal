@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { ComposableMap, Geographies, Geography, ZoomableGroup, useMapContext } from "react-simple-maps";
 import { motion } from "motion/react";
 import {
@@ -18,10 +18,10 @@ import {
   Typography,
 } from "@mui/material";
 import AddIcon from "@mui/icons-material/Add";
-import CloseIcon from "@mui/icons-material/Close";
 import PublicIcon from "@mui/icons-material/Public";
 import RemoveIcon from "@mui/icons-material/Remove";
-import MoreVertIcon from "@mui/icons-material/MoreVert";
+import FullscreenIcon from "@mui/icons-material/Fullscreen";
+import FullscreenExitIcon from "@mui/icons-material/FullscreenExit";
 import worldData from "world-atlas/countries-50m.json";
 import { useRegions } from "@/hooks/useRegions";
 import { useAnimalDistribution } from "@/hooks/useAnimalDistribution";
@@ -29,6 +29,7 @@ import { useAtlasStore } from "@/store/atlasStore";
 import { palette } from "@/theme/theme";
 import type { Region } from "@/types/dto";
 import { countryDisplayName, countrySlug } from "@/lib/countryNames";
+import { COUNTRY_OPTIONS } from "@/lib/countries";
 
 type Coordinates = [number, number];
 
@@ -51,19 +52,6 @@ function viewForRegion(region: Region, rev: number): View {
   const zoom = clampZoom(Math.min(360 / lngSpan, 170 / latSpan) * 0.7);
   return { center: [(swlng + nelng) / 2, (swlat + nelat) / 2], zoom, rev };
 }
-
-interface CountryOption {
-  name: string;
-  displayName: string;
-}
-
-const COUNTRY_OPTIONS: CountryOption[] = (
-  worldData.objects.countries.geometries as Array<{ properties?: { name?: string } }>
-)
-  .map((geometry) => geometry.properties?.name ?? "")
-  .filter(Boolean)
-  .map((name) => ({ name, displayName: countryDisplayName(name) }))
-  .sort((a, b) => a.displayName.localeCompare(b.displayName, "pt-BR"));
 
 interface FramesProps {
   regions: Region[];
@@ -193,7 +181,7 @@ function AnimalDistribution({ points, zoom }: { points: [number, number][]; zoom
   );
 }
 
-export function AtlasMap() {
+export function AtlasMap({ overlay = null }: { overlay?: ReactNode }) {
   const { data, isLoading, isError, error } = useRegions();
   const regions = data ?? EMPTY_REGIONS;
   const regionSlug = useAtlasStore((state) => state.regionSlug);
@@ -201,12 +189,14 @@ export function AtlasMap() {
   const selectRegion = useAtlasStore((state) => state.selectRegion);
   const selectCountry = useAtlasStore((state) => state.selectCountry);
   const selectionName = useAtlasStore((state) => state.selectionName);
+  const mapMode = useAtlasStore((state) => state.mapMode);
+  const setMapMode = useAtlasStore((state) => state.setMapMode);
+  const mapExpanded = useAtlasStore((state) => state.mapExpanded);
+  const toggleMapExpanded = useAtlasStore((state) => state.toggleMapExpanded);
   const { data: distribution = [] } = useAnimalDistribution(animalId);
 
   const [view, setView] = useState<View>(WORLD_VIEW);
   const [zoom, setZoom] = useState(WORLD_VIEW.zoom);
-  const [mapMode, setMapMode] = useState<"biomes" | "countries">("countries");
-  const [mobileControlsOpen, setMobileControlsOpen] = useState(false);
   const [hoveredCountry, setHoveredCountry] = useState<string | null>(null);
   const centerRef = useRef<Coordinates>(WORLD_VIEW.center);
   const hoveredLabel = hoveredCountry ? COUNTRY_OPTIONS.find((country) => countrySlug(country.name) === hoveredCountry)?.displayName : null;
@@ -224,8 +214,6 @@ export function AtlasMap() {
   useEffect(() => {
     const region = regions.find((item) => item.slug === regionSlug);
     if (region) applyView(viewForRegion(region, view.rev + 1));
-    // Only react to selection changes and the region list, not to our own view updates.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [regionSlug, regions]);
 
   const step = (factor: number) =>
@@ -235,6 +223,7 @@ export function AtlasMap() {
     <Box
       sx={{
         position: "relative",
+        flex: 1,
         bgcolor: palette.ocean,
         minHeight: 0,
         minWidth: 0,
@@ -321,43 +310,23 @@ export function AtlasMap() {
 
       <Box
         sx={{
+          display: { xs: "none", md: "block" },
           position: "absolute",
-          top: { xs: 8, md: 16 },
-          left: { xs: 8, md: 16 },
-          right: { xs: "auto", md: "auto" },
-          width: { xs: mobileControlsOpen ? "min(calc(100vw - 16px), 320px)" : "fit-content", md: 380 },
-          ml: { xs: mobileControlsOpen ? 0 : "auto", md: 0 },
-          p: { xs: 1.5, md: 2 },
+          top: 16,
+          left: 16,
+          width: 380,
+          p: 2,
           bgcolor: palette.oceanRaised,
           color: palette.onOcean,
           borderRadius: 1.5,
         }}
       >
         <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <Typography
-            variant="h1"
-            translate="no"
-            sx={{ display: { xs: "none", sm: "block" }, fontSize: { sm: "1.3rem", md: "1.7rem" }, lineHeight: 1.1 }}
-          >
+          <Typography variant="h1" translate="no" sx={{ fontSize: "1.7rem", lineHeight: 1.1 }}>
             Atlas Animal
           </Typography>
-          <IconButton
-            aria-label={mobileControlsOpen ? "Fechar opções do mapa" : "Mostrar opções do mapa"}
-            aria-expanded={mobileControlsOpen}
-            onClick={() => setMobileControlsOpen((open) => !open)}
-            sx={{ display: { xs: "inline-flex", sm: "none" }, color: palette.onOcean, ml: "auto", p: 0.5 }}
-          >
-            {mobileControlsOpen ? <CloseIcon /> : <MoreVertIcon />}
-          </IconButton>
         </Box>
-        <Typography
-          variant="body2"
-          sx={{
-            mt: 0.5,
-            color: palette.onOceanSoft,
-            display: { xs: mobileControlsOpen ? "block" : "none", sm: "block" },
-          }}
-        >
+        <Typography variant="body2" sx={{ mt: 0.5, color: palette.onOceanSoft }}>
           Explore a fauna do mundo, país por país.
         </Typography>
 
@@ -367,18 +336,13 @@ export function AtlasMap() {
           size="small"
           value={mapMode}
           onChange={(_event, value: "biomes" | "countries" | null) => {
-            if (!value) return;
-            if (value === "biomes" && mapMode === "countries" && regionSlug?.startsWith("country-")) {
-              selectRegion(null);
-            }
-            setMapMode(value);
+            if (value) setMapMode(value);
           }}
           aria-label="Modo de visualização do mapa"
           sx={{
-            display: { xs: mobileControlsOpen ? "flex" : "none", sm: "flex" },
-            mt: { xs: 0.75, sm: 1.5 },
+            mt: 1.5,
             "& .MuiToggleButton-root": {
-              minHeight: { xs: 38, sm: 44 },
+              minHeight: 44,
               color: palette.onOcean,
               borderColor: "rgba(255,255,255,0.22)",
               transition: "background-color 150ms ease",
@@ -402,8 +366,7 @@ export function AtlasMap() {
             role="group"
             aria-label="Biomas disponíveis"
             sx={{
-              display: { xs: mobileControlsOpen ? "flex" : "none", sm: "flex" },
-              mt: { xs: 0.75, sm: 1.25 },
+              mt: 1.25,
               overflowX: "auto",
               pb: 0.5,
             }}
@@ -423,7 +386,7 @@ export function AtlasMap() {
                   onClick={() => selectRegion(region.slug)}
                   sx={{
                     flexShrink: 0,
-                    minHeight: { xs: 38, sm: 44 },
+                    minHeight: 44,
                     bgcolor: selected ? palette.ochre : "rgba(255,255,255,0.1)",
                     color: selected ? palette.ocean : palette.onOcean,
                     transition: "background-color 150ms ease",
@@ -449,8 +412,7 @@ export function AtlasMap() {
             getOptionLabel={(country) => country.displayName}
             isOptionEqualToValue={(option, value) => option.name === value.name}
             sx={{
-              display: { xs: mobileControlsOpen ? "block" : "none", sm: "block" },
-              mt: { xs: 0.75, sm: 1 },
+              mt: 1,
               "& .MuiOutlinedInput-root": { bgcolor: "rgba(255,255,255,0.08)", color: palette.onOcean },
               "& .MuiInputLabel-root": { color: palette.onOceanSoft },
               "& .MuiInputLabel-root.Mui-focused": { color: palette.ochre },
@@ -470,7 +432,7 @@ export function AtlasMap() {
         )}
 
         {isError && (
-          <Alert severity="error" sx={{ mt: { xs: 0.75, sm: 1.5 } }}>
+          <Alert severity="error" sx={{ mt: 1.5 }}>
             {error.message}
           </Alert>
         )}
@@ -480,9 +442,10 @@ export function AtlasMap() {
         <Typography
           aria-hidden
           sx={{
+            display: { xs: "none", md: "block" },
             position: "absolute",
-            left: { xs: 8, md: 16 },
-            bottom: { xs: 8, md: 16 },
+            left: 16,
+            bottom: 16,
             px: 1.5,
             py: 0.75,
             bgcolor: palette.oceanRaised,
@@ -498,11 +461,11 @@ export function AtlasMap() {
 
       <Stack
         spacing={0.5}
-        sx={{ position: "absolute", right: 12, bottom: 12, bgcolor: palette.oceanRaised, borderRadius: 1.5, p: 0.5 }}
+        sx={{ position: "absolute", right: { xs: 8, md: 12 }, bottom: { xs: overlay ? 96 : 8, md: 12 }, bgcolor: palette.oceanRaised, borderRadius: 1.5, p: 0.5 }}
       >
         {[
-          { label: "Aproximar o mapa", icon: <AddIcon />, onClick: () => step(1.6) },
-          { label: "Afastar o mapa", icon: <RemoveIcon />, onClick: () => step(1 / 1.6) },
+          { label: "Aproximar o mapa", icon: <AddIcon />, onClick: () => step(1.6), phoneOnly: false },
+          { label: "Afastar o mapa", icon: <RemoveIcon />, onClick: () => step(1 / 1.6), phoneOnly: false },
           {
             label: "Restaurar a visão inicial do mapa",
             icon: <PublicIcon />,
@@ -510,19 +473,36 @@ export function AtlasMap() {
               applyView({ ...WORLD_VIEW, rev: view.rev + 1 });
               selectRegion(null);
             },
+            phoneOnly: false,
+          },
+          {
+            label: mapExpanded ? "Mostrar o cabeçalho" : "Expandir o mapa",
+            icon: mapExpanded ? <FullscreenExitIcon /> : <FullscreenIcon />,
+            onClick: toggleMapExpanded,
+            phoneOnly: true,
           },
         ].map((control) => (
           <Tooltip key={control.label} title={control.label} placement="left">
             <IconButton
               aria-label={control.label}
               onClick={control.onClick}
-              sx={{ color: palette.onOcean, "&:hover": { bgcolor: "rgba(255,255,255,0.14)" } }}
+              sx={{
+                display: control.phoneOnly ? { xs: "inline-flex", md: "none" } : undefined,
+                color: palette.onOcean,
+                "&:hover": { bgcolor: "rgba(255,255,255,0.14)" },
+              }}
             >
               {control.icon}
             </IconButton>
           </Tooltip>
         ))}
       </Stack>
+
+      {overlay && (
+        <Box sx={{ position: "absolute", left: 8, right: 8, bottom: 8, zIndex: 1, pointerEvents: "none", "& > *": { pointerEvents: "auto" } }}>
+          {overlay}
+        </Box>
+      )}
 
       <Box
         role="status"

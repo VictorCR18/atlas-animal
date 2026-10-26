@@ -4,15 +4,18 @@ import type {
   AnimalSummary,
   Conservation,
   DistributionPoint,
+  GroupCount,
   Photo,
   Region,
   TaxonGroup,
   TaxonomyEntry,
 } from "@/types/dto";
 import { normalizeText, portugueseCommonName } from "@/lib/format";
+import { TAXON_GROUPS } from "@/types/dto";
 import { brazilianNames, looksPortuguese, portugueseSummary } from "@/services/ptWiki";
 
 const BASE_URL = "https://api.inaturalist.org/v2";
+const BASE_URL_V1 = "https://api.inaturalist.org/v1";
 const PER_PAGE = 20;
 const ANIMALIA_TAXON_ID = 1;
 // iNaturalist place for Brazil: makes common names follow the usage in Brazil.
@@ -120,8 +123,12 @@ const regions: Region[] = [
 
 const countryRegions = new Map<string, Promise<Region>>();
 
-async function request<T>(path: string, params: Record<string, string | number | undefined> = {}): Promise<T> {
-  const url = new URL(`${BASE_URL}${path}`);
+async function request<T>(
+  path: string,
+  params: Record<string, string | number | undefined> = {},
+  baseUrl: string = BASE_URL,
+): Promise<T> {
+  const url = new URL(`${baseUrl}${path}`);
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== "") url.searchParams.set(key, String(value));
   });
@@ -145,7 +152,7 @@ export async function fetchRegions(): Promise<Region[]> {
   return regions;
 }
 
-async function getRegion(slug: string): Promise<Region> {
+export async function getRegion(slug: string): Promise<Region> {
   if (slug === "global") {
     return {
       id: "global",
@@ -183,7 +190,7 @@ async function getRegion(slug: string): Promise<Region> {
   return promise;
 }
 
-function placeParams(region: Region): Record<string, number> {
+export function placeParams(region: Region): Record<string, number> {
   return region.inaturalistPlaceId > 0
     ? { place_id: region.inaturalistPlaceId }
     : { swlat: region.bounds.swlat, swlng: region.bounds.swlng, nelat: region.bounds.nelat, nelng: region.bounds.nelng };
@@ -343,4 +350,20 @@ export async function fetchAnimalDistribution(id: number): Promise<DistributionP
   return data.results
     .map((item) => item.geojson?.type === "Point" && item.geojson.coordinates ? item.geojson.coordinates : null)
     .filter((point): point is DistributionPoint => point !== null);
+}
+
+const ANIMAL_ICONICS = new Set<string>([...TAXON_GROUPS, "Animalia"]);
+
+/** Species per animal group in a region, largest first. One request; the v2 API has no equivalent endpoint. */
+export async function fetchGroupCounts(slug: string): Promise<GroupCount[]> {
+  const region = await getRegion(slug);
+  const data = await request<{ results: { count: number; taxon: { name: string; iconic_taxon_name?: string } }[] }>(
+    "/observations/iconic_taxa_species_counts",
+    { ...placeParams(region), quality_grade: "research", photos: "true" },
+    BASE_URL_V1,
+  );
+  return data.results
+    .map((row) => ({ group: row.taxon.iconic_taxon_name ?? row.taxon.name, count: row.count }))
+    .filter((row) => ANIMAL_ICONICS.has(row.group) && row.count > 0)
+    .sort((a, b) => b.count - a.count);
 }

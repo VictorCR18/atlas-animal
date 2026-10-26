@@ -12,7 +12,7 @@ export function Footer() {
         color: palette.onOceanSoft,
         px: 2,
         py: 0.75,
-        display: "flex",
+        display: { xs: "none", md: "flex" },
         justifyContent: "space-between",
         columnGap: 2,
         flexWrap: "wrap",

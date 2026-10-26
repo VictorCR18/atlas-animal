@@ -12,7 +12,7 @@ export const metadata: Metadata = {
   description: "Explore a fauna por região, com dados e fotos do iNaturalist.",
 };
 
-export const viewport: Viewport = { themeColor: "#0F2A25" };
+export const viewport: Viewport = { themeColor: "#0F2A25", viewportFit: "cover", colorScheme: "light" };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (

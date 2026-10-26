@@ -101,7 +101,7 @@ export function AnimalList() {
           onChange={(event) => setInput(event.target.value)}
           type="search"
           placeholder="Nome popular ou científico…"
-          sx={{ mt: { xs: 1.25, sm: 2 } }}
+          sx={{ mt: { xs: 1.25, sm: 2 }, "& input": { fontSize: { xs: 16, md: undefined } } }}
           slotProps={{
             htmlInput: { "aria-label": "Buscar animais nesta região", name: "busca", autoComplete: "off", spellCheck: false },
             input: {

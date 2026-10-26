@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Alert, Box, Button, Chip, Link, Skeleton, Stack, Typography } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import MapOutlinedIcon from "@mui/icons-material/MapOutlined";
 import OpenInNewIcon from "@mui/icons-material/OpenInNew";
 import { useAnimalDetail } from "@/hooks/useAnimalDetail";
 import { CONSERVATION_COLORS, displayName, formatCount, groupLabel } from "@/lib/format";
@@ -17,6 +18,7 @@ export function AnimalDetail() {
   const regionSlug = useAtlasStore((state) => state.regionSlug);
   const selectionName = useAtlasStore((state) => state.selectionName);
   const selectAnimal = useAtlasStore((state) => state.selectAnimal);
+  const setMobileTab = useAtlasStore((state) => state.setMobileTab);
   const { data, isLoading, isError, error, refetch } = useAnimalDetail(animalId, regionSlug);
   const [index, setIndex] = useState(0);
 
@@ -31,9 +33,17 @@ export function AnimalDetail() {
 
   return (
     <Box sx={{ height: "100%", display: "flex", flexDirection: "column" }}>
-      <Box sx={{ px: 1.5, pt: 1.5 }}>
-        <Button startIcon={<ArrowBackIcon />} onClick={() => selectAnimal(null)} color="primary">
+      <Box sx={{ px: 1.5, pt: 1.5, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Button startIcon={<ArrowBackIcon />} onClick={() => selectAnimal(null)} color="primary" sx={{ minHeight: 44 }}>
           Voltar à lista
+        </Button>
+        <Button
+          startIcon={<MapOutlinedIcon />}
+          onClick={() => setMobileTab("mapa")}
+          color="primary"
+          sx={{ display: { xs: "inline-flex", md: "none" }, minHeight: 44 }}
+        >
+          Ver no mapa
         </Button>
       </Box>
 
